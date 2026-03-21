@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "change-log": {
+      "command": "dotnet",
+      "args": [ "run", "--project", "ChangeLog.mcp.server.csproj" ]
+    }
+  }
+}

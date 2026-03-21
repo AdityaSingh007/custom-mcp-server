@@ -1,0 +1,6 @@
+@ChangeLog.mcp.server_HostAddress = http://localhost:5224
+
+GET {{ChangeLog.mcp.server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

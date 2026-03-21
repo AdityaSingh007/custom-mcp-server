@@ -1,0 +1,16 @@
+{
+  "name": "@cae/mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server for ChangeLog",
+  "scripts": {
+    "start": "dotnet run --project ChangeLog.mcp.server.csproj",
+    "dev": "npx @modelcontextprotocol/inspector --config mcp.json"
+  },
+  "keywords": [],
+  "author": "Aditya Singh",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@modelcontextprotocol/inspector": "0.17.2"
+  }
+}

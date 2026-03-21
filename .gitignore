@@ -416,3 +416,4 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+/ChangeLog.mcp.server/Properties/launchSettings.json
