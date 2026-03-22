@@ -76,18 +76,23 @@ namespace ChangeLog.mcp.server.NewFolder
                     version = match.Groups["version"].Value;
                 }
 
-                markdownFiles.Add(new MarkdownFileInfo
+                if (!string.IsNullOrWhiteSpace(version)) 
                 {
-                    FileName = fileInfo.Name,
-                    FullPath = fileInfo.FullName,
-                    RelativePath = Path.GetRelativePath(directoryPath, fileInfo.FullName),
-                    SizeInBytes = fileInfo.Length,
-                    CreatedDate = fileInfo.CreationTime,
-                    LastModifiedDate = fileInfo.LastWriteTime,
-                    LastAccessedDate = fileInfo.LastAccessTime,
-                    IsReadOnly = fileInfo.IsReadOnly,
-                    Version = version
-                });
+                    markdownFiles.Add(new MarkdownFileInfo
+                    {
+                        FileName = fileInfo.Name,
+                        FullPath = fileInfo.FullName,
+                        RelativePath = Path.GetRelativePath(directoryPath, fileInfo.FullName),
+                        SizeInBytes = fileInfo.Length,
+                        CreatedDate = fileInfo.CreationTime,
+                        LastModifiedDate = fileInfo.LastWriteTime,
+                        LastAccessedDate = fileInfo.LastAccessTime,
+                        IsReadOnly = fileInfo.IsReadOnly,
+                        Version = version
+                    });
+                }
+
+                
             }
 
             return markdownFiles;
