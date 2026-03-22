@@ -8,8 +8,16 @@ using System.Text.RegularExpressions;
 namespace ChangeLog.mcp.server.NewFolder
 {
     [McpServerResourceType]
-    public static class ChangeLogResources
+    public class ChangeLogResources
     {
+        private readonly IConfiguration _configuration;
+
+        // Inject IConfiguration through the constructor
+        public ChangeLogResources(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
+
         public const string ResourceApiChangelogsUri = "api://changelogs";
         public const string ResourceApiChangelogsDocumentUri = "api://changelogs/{apiversion}";
 
@@ -19,9 +27,9 @@ namespace ChangeLog.mcp.server.NewFolder
         Title = "Api changelog Documents",
         MimeType = "application/json")]
         [Description("Provides a list of changelog documents available to application users.")]
-        public static async Task<IEnumerable<ResourceContents>> DocumentListResource(CancellationToken cancellationToken)
+        public async Task<IEnumerable<ResourceContents>> DocumentListResource(CancellationToken cancellationToken)
         {
-            var documentInfos = await GetMarkdownFilesWithMetadataAsync(@"C:\custom-mcp\custom-mcp-server\App-Changelogs", cancellationToken);
+            var documentInfos = await GetMarkdownFilesWithMetadataAsync(_configuration["changeLogDirPath"] ?? throw new ArgumentNullException("changeLogDirPath"), cancellationToken);
 
             return documentInfos.Select(info => new TextResourceContents
             {
@@ -36,9 +44,9 @@ namespace ChangeLog.mcp.server.NewFolder
         Name = "Api changelog Document by ID",
         MimeType = "text/markdown")]
         [Description("Retrieves a specific change log file")]
-        public static async Task<ResourceContents> DocumentResourceById(string apiversion,CancellationToken cancellationToken)
+        public async Task<ResourceContents> DocumentResourceById(string apiversion, CancellationToken cancellationToken)
         {
-            var downloadResult = await File.ReadAllTextAsync($@"C:\custom-mcp\custom-mcp-server\App-Changelogs\api-v{apiversion}.md", cancellationToken);
+            var downloadResult = await File.ReadAllTextAsync($"{_configuration["changeLogDirPath"] ?? throw new ArgumentNullException("changeLogDirPath")}\\api-v{apiversion}.md", cancellationToken);
 
             if (string.IsNullOrEmpty(downloadResult))
             {
@@ -53,7 +61,7 @@ namespace ChangeLog.mcp.server.NewFolder
             };
         }
 
-        public static List<MarkdownFileInfo> GetMarkdownFilesWithMetadata(string directoryPath)
+        public List<MarkdownFileInfo> GetMarkdownFilesWithMetadata(string directoryPath)
         {
             var markdownFiles = new List<MarkdownFileInfo>();
 
@@ -76,7 +84,7 @@ namespace ChangeLog.mcp.server.NewFolder
                     version = match.Groups["version"].Value;
                 }
 
-                if (!string.IsNullOrWhiteSpace(version)) 
+                if (!string.IsNullOrWhiteSpace(version))
                 {
                     markdownFiles.Add(new MarkdownFileInfo
                     {
@@ -92,13 +100,13 @@ namespace ChangeLog.mcp.server.NewFolder
                     });
                 }
 
-                
+
             }
 
             return markdownFiles;
         }
 
-        public static async Task<List<MarkdownFileInfo>> GetMarkdownFilesWithMetadataAsync(string directoryPath, CancellationToken cancellationToken = default)
+        public async Task<List<MarkdownFileInfo>> GetMarkdownFilesWithMetadataAsync(string directoryPath, CancellationToken cancellationToken = default)
         {
             return await Task.Run(() => GetMarkdownFilesWithMetadata(directoryPath), cancellationToken);
         }
@@ -106,14 +114,14 @@ namespace ChangeLog.mcp.server.NewFolder
 
     public class MarkdownFileInfo
     {
-        public string FileName { get; set; }
-        public string FullPath { get; set; }
-        public string RelativePath { get; set; }
+        public required string FileName { get; set; }
+        public required string FullPath { get; set; }
+        public required string RelativePath { get; set; }
         public long SizeInBytes { get; set; }
         public DateTime CreatedDate { get; set; }
         public DateTime LastModifiedDate { get; set; }
         public DateTime LastAccessedDate { get; set; }
         public bool IsReadOnly { get; set; }
-        public string Version { get; set; }
+        public required string Version { get; set; }
     }
 }

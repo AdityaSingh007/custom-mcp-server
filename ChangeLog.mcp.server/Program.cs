@@ -8,6 +8,10 @@ builder.Services.AddMcpServer()
 
 builder.Services.AddCors();
 
+builder.Configuration
+    .AddUserSecrets<Program>()
+    .AddEnvironmentVariables();
+
 // Configure all logs to go to stderr for MCP server
 builder.Logging.AddConsole(consoleLogOptions =>
 {
