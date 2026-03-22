@@ -69,7 +69,7 @@ namespace ChangeLog.mcp.server.NewFolder
                 var fileInfo = new FileInfo(filePath);
 
                 // Try to extract a version from file name. Expected pattern: api-v{version}.md
-                string version = null;
+                string version = string.Empty;
                 var match = Regex.Match(fileInfo.Name, @"api-v(?<version>[\w\.\-]+)\.md$", RegexOptions.IgnoreCase);
                 if (match.Success)
                 {
