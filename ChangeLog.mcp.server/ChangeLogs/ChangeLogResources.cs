@@ -3,6 +3,7 @@ using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using System.ComponentModel;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace ChangeLog.mcp.server.NewFolder
 {
@@ -10,7 +11,7 @@ namespace ChangeLog.mcp.server.NewFolder
     public static class ChangeLogResources
     {
         public const string ResourceApiChangelogsUri = "api://changelogs";
-        public const string ResourceApiChangelogsDocumentUri = "api://changelogs/{fileName}";
+        public const string ResourceApiChangelogsDocumentUri = "api://changelogs/{apiversion}";
 
         [McpServerResource(
         UriTemplate = ResourceApiChangelogsUri,
@@ -20,13 +21,13 @@ namespace ChangeLog.mcp.server.NewFolder
         [Description("Provides a list of changelog documents available to application users.")]
         public static async Task<IEnumerable<ResourceContents>> DocumentListResource(CancellationToken cancellationToken)
         {
-            var documentInfos = await GetMarkdownFilesWithMetadataAsync(@"C:\CAE_Github\Se.Cae.Web\src\docs\api", cancellationToken);
+            var documentInfos = await GetMarkdownFilesWithMetadataAsync(@"C:\custom-mcp\custom-mcp-server\App-Changelogs", cancellationToken);
 
             return documentInfos.Select(info => new TextResourceContents
             {
                 Text = JsonSerializer.Serialize(info, McpJsonUtilities.DefaultOptions),
                 MimeType = "application/json",
-                Uri = ResourceApiChangelogsDocumentUri.Replace("{fileName}", info.FileName),
+                Uri = ResourceApiChangelogsDocumentUri.Replace("{apiversion}", info.Version),
             });
         }
 
@@ -35,9 +36,9 @@ namespace ChangeLog.mcp.server.NewFolder
         Name = "Api changelog Document by ID",
         MimeType = "text/markdown")]
         [Description("Retrieves a specific change log file")]
-        public static async Task<ResourceContents> DocumentResourceById(string fileName,CancellationToken cancellationToken)
+        public static async Task<ResourceContents> DocumentResourceById(string apiversion,CancellationToken cancellationToken)
         {
-            var downloadResult = await File.ReadAllTextAsync(@"C:\CAE_Github\Se.Cae.Web\src\docs\api\"+fileName, cancellationToken);
+            var downloadResult = await File.ReadAllTextAsync($@"C:\custom-mcp\custom-mcp-server\App-Changelogs\api-v{apiversion}.md", cancellationToken);
 
             if (string.IsNullOrEmpty(downloadResult))
             {
@@ -48,7 +49,7 @@ namespace ChangeLog.mcp.server.NewFolder
             {
                 Text = downloadResult,
                 MimeType = "text/markdown",
-                Uri = ResourceApiChangelogsDocumentUri.Replace("{fileName}", fileName),
+                Uri = ResourceApiChangelogsDocumentUri.Replace("{apiversion}", apiversion),
             };
         }
 
@@ -66,7 +67,15 @@ namespace ChangeLog.mcp.server.NewFolder
             foreach (var filePath in mdFiles)
             {
                 var fileInfo = new FileInfo(filePath);
-                
+
+                // Try to extract a version from file name. Expected pattern: api-v{version}.md
+                string version = null;
+                var match = Regex.Match(fileInfo.Name, @"api-v(?<version>[\w\.\-]+)\.md$", RegexOptions.IgnoreCase);
+                if (match.Success)
+                {
+                    version = match.Groups["version"].Value;
+                }
+
                 markdownFiles.Add(new MarkdownFileInfo
                 {
                     FileName = fileInfo.Name,
@@ -76,7 +85,8 @@ namespace ChangeLog.mcp.server.NewFolder
                     CreatedDate = fileInfo.CreationTime,
                     LastModifiedDate = fileInfo.LastWriteTime,
                     LastAccessedDate = fileInfo.LastAccessTime,
-                    IsReadOnly = fileInfo.IsReadOnly
+                    IsReadOnly = fileInfo.IsReadOnly,
+                    Version = version
                 });
             }
 
@@ -99,5 +109,6 @@ namespace ChangeLog.mcp.server.NewFolder
         public DateTime LastModifiedDate { get; set; }
         public DateTime LastAccessedDate { get; set; }
         public bool IsReadOnly { get; set; }
+        public string Version { get; set; }
     }
 }
