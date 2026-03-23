@@ -1,41 +1,13 @@
+using ChangeLog.mcp.server.Configurations;
+using ChangeLog.mcp.server.Extensions;
+using ChangeLog.mcp.server.Interfaces;
+using ChangeLog.mcp.server.Services;
+
 var builder = WebApplication.CreateBuilder(args);
-builder.WebHost.UseUrls("http://0.0.0.0:5000");
-builder.Services.AddMcpServer()
-                .WithHttpTransport(options => 
-                {
-                    options.Stateless = true;
-                })
-                .WithResourcesFromAssembly()
-                .WithPromptsFromAssembly()
-                .WithToolsFromAssembly();
+var mcpConfiguration  = builder.Configuration.GetSection("McpServerSettings").Get<McpServerSettings>();
 
-builder.Services.AddCors();
+builder.Services.AddSingleton<IChangeLogService, ChangeLogService>();
 
-builder.Services.AddHttpContextAccessor();
+var app = builder.BuildApp(mcpConfiguration ?? new McpServerSettings());
 
-//builder.Configuration
-//    .AddUserSecrets<Program>()
-//    .AddEnvironmentVariables();
-
-// Configure all logs to go to stderr for MCP server
-//builder.Logging.AddConsole(consoleLogOptions =>
-//{
-//    // Configure all logs to go to stderr
-//    consoleLogOptions.LogToStandardErrorThreshold = LogLevel.Error;
-//});
-
-var app = builder.Build();
-
-//app.UseHttpsRedirection();
-
-app.UseCors(policy =>
-{
-    policy.AllowAnyOrigin()
-          .AllowAnyMethod()
-          .AllowAnyHeader();
-});
-
-app.MapMcp(pattern:"/mcp");
-app.MapGet("/api/healthz", () => "Healthy");
-
-app.Run();
+await app.RunAsync();
