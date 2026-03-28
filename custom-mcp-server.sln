@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McpAspireHost", "McpAspireH
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProjectServiceDefaults", "ProjectServiceDefaults\ProjectServiceDefaults.csproj", "{E4EBB417-E77A-154D-F23D-28D0C486D6B8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Github-Co-Pilot-Local", "Github-Co-Pilot-Local\Github-Co-Pilot-Local.csproj", "{26D30B43-A723-429B-9DD9-99F4D3D97373}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,6 +28,10 @@ Global
 		{E4EBB417-E77A-154D-F23D-28D0C486D6B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E4EBB417-E77A-154D-F23D-28D0C486D6B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E4EBB417-E77A-154D-F23D-28D0C486D6B8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{26D30B43-A723-429B-9DD9-99F4D3D97373}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{26D30B43-A723-429B-9DD9-99F4D3D97373}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{26D30B43-A723-429B-9DD9-99F4D3D97373}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{26D30B43-A723-429B-9DD9-99F4D3D97373}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
