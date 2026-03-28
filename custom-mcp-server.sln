@@ -1,8 +1,12 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.5.2.0
+# Visual Studio Version 18
+VisualStudioVersion = 18.4.11612.150 stable
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChangeLog.mcp.server", "ChangeLog.mcp.server\ChangeLog.mcp.server.csproj", "{5779D2A1-BF79-BC25-6650-A149F2BDDB3E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McpAspireHost", "McpAspireHost\McpAspireHost.csproj", "{EA5926C1-3E8E-AC31-BD8D-F8D60C430A7B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProjectServiceDefaults", "ProjectServiceDefaults\ProjectServiceDefaults.csproj", "{E4EBB417-E77A-154D-F23D-28D0C486D6B8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -14,6 +18,14 @@ Global
 		{5779D2A1-BF79-BC25-6650-A149F2BDDB3E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5779D2A1-BF79-BC25-6650-A149F2BDDB3E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5779D2A1-BF79-BC25-6650-A149F2BDDB3E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EA5926C1-3E8E-AC31-BD8D-F8D60C430A7B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EA5926C1-3E8E-AC31-BD8D-F8D60C430A7B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EA5926C1-3E8E-AC31-BD8D-F8D60C430A7B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EA5926C1-3E8E-AC31-BD8D-F8D60C430A7B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E4EBB417-E77A-154D-F23D-28D0C486D6B8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E4EBB417-E77A-154D-F23D-28D0C486D6B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E4EBB417-E77A-154D-F23D-28D0C486D6B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E4EBB417-E77A-154D-F23D-28D0C486D6B8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -14,7 +14,7 @@ namespace ChangeLog.mcp.server.Extensions
 
             if (mcpServerSettings.UseStreamableHttp == true)
             {
-                (builder as WebApplicationBuilder)?.WebHost.UseUrls(mcpServerSettings.ServerUrl);
+                //(builder as WebApplicationBuilder)?.WebHost.UseUrls(mcpServerSettings.ServerUrl);
 
                 builder.Services.AddMcpServer()
                                 .WithHttpTransport(o => o.Stateless = mcpServerSettings.IsStateless)
