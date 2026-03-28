@@ -52,5 +52,27 @@ namespace ChangeLog.mcp.server.ChangeLogs
            ];
 
         }
+
+        [McpServerTool(Name = "get_version_changes_content", Title = "Get api version changes"), Description(
+       """
+        Help get information about api version changes for a specific version.
+        The tool helps get information about api version changes for a specific version.
+        Prompt for the version unless they provided it already. 
+        Present the response to the user in a client-facing format.
+        """)]
+        public async Task<IEnumerable<ContentBlock>> GetVersionChangesAsContent(
+        [Description("Provided by the user")] string versionName,
+        CancellationToken cancellationToken)
+        {
+            var filePath = $"{_configuration["changeLogDirPath"] ?? throw new ArgumentNullException("changeLogDirPath")}\\api-v{versionName}.md";
+            var fileContent = await File.ReadAllTextAsync(filePath, cancellationToken);
+            return [
+            new TextContentBlock
+            {
+                Text=fileContent
+            }
+           ];
+
+        }
     }
 }

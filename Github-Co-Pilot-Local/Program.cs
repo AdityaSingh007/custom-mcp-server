@@ -12,7 +12,7 @@ await using var session = await client.CreateSessionAsync(new SessionConfig
         {
             Type = "http",
             Url = "http://0.0.0.0:5000/mcp",
-            Tools = new List<string> { "*" },
+            Tools = new List<string> { "get_version_changes_content" },
         },
     },
 }
