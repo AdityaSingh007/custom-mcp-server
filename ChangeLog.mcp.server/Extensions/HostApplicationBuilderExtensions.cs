@@ -46,7 +46,7 @@ namespace ChangeLog.mcp.server.Extensions
 
                 webApp.UseCors("AllowLocalhostOrigins");
                 webApp.MapMcp($"/{mcpServerSettings.McpEndpoint}");
-                webApp.MapGet("/api/healthz", () => "Healthy");
+                webApp.MapGet("/health", () => "Healthy");
 
                 return webApp;
             }
