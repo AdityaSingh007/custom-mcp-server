@@ -1,4 +1,6 @@
 ﻿using ChangeLog.mcp.server.Configurations;
+using ChangeLog.mcp.server.Interfaces;
+using ChangeLog.mcp.server.Services;
 
 namespace ChangeLog.mcp.server.Extensions
 {
@@ -6,6 +8,10 @@ namespace ChangeLog.mcp.server.Extensions
     {
         public static IHost BuildApp(this IHostApplicationBuilder builder, McpServerSettings mcpServerSettings)
         {
+            builder.AddServiceDefaults();
+
+            builder.Services.AddSingleton<IChangeLogService, ChangeLogService>();
+
             if (mcpServerSettings.UseStreamableHttp == true)
             {
                 (builder as WebApplicationBuilder)?.WebHost.UseUrls(mcpServerSettings.ServerUrl);
