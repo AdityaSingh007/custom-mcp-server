@@ -1,22 +1,33 @@
 ﻿using GitHub.Copilot.SDK;
+using Github_Co_Pilot_Local.CoPilot_Client;
+using Github_Co_Pilot_Local.McpUtils;
+using Microsoft.Extensions.Configuration;
 
-await using var client = new CopilotClient();
-await using var session = await client.CreateSessionAsync(new SessionConfig
+var builder = new ConfigurationBuilder();
+builder.SetBasePath(Directory.GetCurrentDirectory())
+       .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+
+IConfigurationRoot configuration = builder.Build();
+var mcpServerSettings = configuration.GetSection("McpServers").Get<Dictionary<string, McpRemoteServerConfig>>();
+
+// If configuration is missing or empty, fall back to a default MCP server config.
+if (mcpServerSettings == null || mcpServerSettings.Count == 0)
+{
+    throw new Exception("Missing mcp server configuration");
+}
+
+// Convert to the expected Dictionary<string, object> for the session config.
+var mcpServersForSession = mcpServerSettings.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value);
+
+var coPilot_Service = new CoPilotService(new SessionConfig
 {
     Model = "gpt-4.1",
     Streaming = true,
-    OnPermissionRequest = PromptPermission,
-    McpServers = new Dictionary<string, object>
-    {
-        ["remote-change-log-mcp"] = new McpRemoteServerConfig
-        {
-            Type = "http",
-            Url = "http://0.0.0.0:5000/mcp",
-            Tools = new List<string> { "get_version_changes_content" },
-        },
-    },
-}
-);
+    OnPermissionRequest = McpPermission.PromptPermission,
+    McpServers = mcpServersForSession,
+});
+
+await using var session = await coPilot_Service.GetCopilotSessionAsync();
 
 
 using var _ = session.On(evt =>
@@ -34,6 +45,7 @@ using var _ = session.On(evt =>
     Console.ResetColor();
 });
 
+
 while (true)
 {
     Console.Write("You: ");
@@ -44,20 +56,15 @@ while (true)
         break;
     }
 
-    Console.Write("Assistant: ");
+    // show spinner while waiting for assistant response
+    var (spinnerCts, spinnerTask) = McpPermission.StartSpinner();
     var reply = await session.SendAndWaitAsync(new MessageOptions { Prompt = input });
-    Console.WriteLine($"\nAssistant: {reply?.Data.Content}\n");
+    // stop the spinner and wait for task to complete
+    spinnerCts.Cancel();
+    try { await spinnerTask; } catch { }
+
+    // print the assistant reply on the same line after the prefix
+    Console.WriteLine($"{reply?.Data.Content}\n");
 }
 
 
-static Task<PermissionRequestResult> PromptPermission(
-    PermissionRequest request, PermissionInvocation invocation)
-{
-    Console.WriteLine($"\n[Permission Request: {request.Kind}]");
-    Console.Write("Approve? (y/n): ");
-
-    string? input = Console.ReadLine()?.Trim().ToUpperInvariant();
-    PermissionRequestResultKind kind = input is "Y" or "YES" ? PermissionRequestResultKind.Approved : PermissionRequestResultKind.DeniedInteractivelyByUser;
-
-    return Task.FromResult(new PermissionRequestResult { Kind = kind });
-}
