@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\BlobService\BlobService.csproj" />
     <ProjectReference Include="..\ChangeLog.mcp.server\ChangeLog.mcp.server.csproj" />
   </ItemGroup>
 
