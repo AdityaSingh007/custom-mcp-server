@@ -1,5 +1,7 @@
 <Solution>
+  <Project Path="BlobService/BlobService.csproj" />
   <Project Path="ChangeLog.mcp.server/ChangeLog.mcp.server.csproj" />
+  <Project Path="Github-Co-Pilot-Local/Github-Co-Pilot-Local.csproj" />
   <Project Path="McpAspireHost/McpAspireHost.csproj" Id="ceb1c7b3-258c-4497-886b-71562fb7dbfa" />
   <Project Path="ProjectServiceDefaults/ProjectServiceDefaults.csproj" Id="5c087843-6f1b-486a-89c2-26d624b9c04f" />
 </Solution>
