@@ -56,22 +56,46 @@ namespace ChangeLog.mcp.server.ChangeLogs
         [McpServerTool(Name = "get_version_changes_content", Title = "Get api version changes"), Description(
        """
         Help get information about api version changes for a specific version.
-        The tool helps get information about api version changes for a specific version.
+        The tool helps get information about api version changes for a specific version by extracting information from a swagger file.
+        If the file is too large use techniques for efficient read.
         Prompt for the version unless they provided it already. 
         Present the response to the user in a client-facing format.
         """)]
-        public async Task<IEnumerable<ContentBlock>> GetVersionChangesAsContent(
+        public async Task<BlobResourceContents> GetVersionChangesAsContent(
         [Description("Provided by the user")] string versionName,
         CancellationToken cancellationToken)
         {
-            var filePath = $"{_configuration["changeLogDirPath"] ?? throw new ArgumentNullException("changeLogDirPath")}\\api-v{versionName}.md";
-            var fileContent = await File.ReadAllTextAsync(filePath, cancellationToken);
-            return [
-            new TextContentBlock
+            var filePath = $"{_configuration["changeLogDirPath"] ?? throw new ArgumentNullException("changeLogDirPath")}\\swagger-{versionName}.json";
+            try
             {
-                Text=fileContent
+                // Read the file content into a byte array
+                byte[] fileBytes = await System.IO.File.ReadAllBytesAsync(filePath, cancellationToken);
+
+                // Determine the MIME type (you might need a helper function for this)
+                string mimeType = "application/octet-stream"; // Default MIME type
+                                                              // Example helper (not shown): mimeType = MimeTypeHelper.GetMimeType(fullPath);
+
+                return new BlobResourceContents
+                {
+                    Blob = fileBytes,
+                    MimeType = mimeType,
+                    Uri = $"file://{filePath}" // Ensure a valid MCP URI
+                };
             }
-           ];
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                return new BlobResourceContents
+                {
+                    Blob = Array.Empty<byte>(),
+                    MimeType = "text/plain",
+                    Uri = $"error://{filePath}"
+                };
+            }
+            finally
+            {
+
+            }
 
         }
     }

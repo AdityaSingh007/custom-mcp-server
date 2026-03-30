@@ -56,15 +56,21 @@ while (true)
         break;
     }
 
-    // show spinner while waiting for assistant response
-    var (spinnerCts, spinnerTask) = McpPermission.StartSpinner();
-    var reply = await session.SendAndWaitAsync(new MessageOptions { Prompt = input });
-    // stop the spinner and wait for task to complete
-    spinnerCts.Cancel();
-    try { await spinnerTask; } catch { }
+    try
+    {
+        var reply = await session.SendAndWaitAsync(new MessageOptions { Prompt = input }, timeout: TimeSpan.FromMinutes(5));
+        // print the assistant reply on the same line after the prefix
+        Console.WriteLine($"{reply?.Data.Content}\n");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error: {ex.Message}");
+    }
+    finally
+    {
 
-    // print the assistant reply on the same line after the prefix
-    Console.WriteLine($"{reply?.Data.Content}\n");
+    }
+
 }
 
 
