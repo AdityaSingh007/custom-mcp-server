@@ -21,7 +21,7 @@ var mcpServersForSession = mcpServerSettings.ToDictionary(kvp => kvp.Key, kvp =>
 
 var coPilot_Service = new CoPilotService(new SessionConfig
 {
-    Model = "gpt-4.1",
+    Model = "Claude Haiku 4.5",
     Streaming = true,
     OnPermissionRequest = McpPermission.PromptPermission,
     McpServers = mcpServersForSession,

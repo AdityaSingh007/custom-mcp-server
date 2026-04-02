@@ -68,18 +68,13 @@ namespace ChangeLog.mcp.server.ChangeLogs
             var filePath = $"{_configuration["changeLogDirPath"] ?? throw new ArgumentNullException("changeLogDirPath")}\\swagger-{versionName}.json";
             try
             {
-                // Read the file content into a byte array
                 byte[] fileBytes = await System.IO.File.ReadAllBytesAsync(filePath, cancellationToken);
-
-                // Determine the MIME type (you might need a helper function for this)
-                string mimeType = "application/octet-stream"; // Default MIME type
-                                                              // Example helper (not shown): mimeType = MimeTypeHelper.GetMimeType(fullPath);
 
                 return new BlobResourceContents
                 {
                     Blob = fileBytes,
-                    MimeType = mimeType,
-                    Uri = $"file://{filePath}" // Ensure a valid MCP URI
+                    MimeType = "application/octet-stream",
+                    Uri = $"file://{filePath}"
                 };
             }
             catch (Exception ex)
