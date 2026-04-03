@@ -9,16 +9,17 @@ namespace Github_Co_Pilot_Local.CoPilot_Client
     public class CoPilotService : ICoPilotService
     {
         private readonly SessionConfig _sessionConfig;
+        private readonly CopilotClient _copilotClient;
 
-        public CoPilotService(SessionConfig sessionConfig)
+        public CoPilotService(SessionConfig sessionConfig , CopilotClient copilotClient)
         {
             this._sessionConfig = sessionConfig;
+            this._copilotClient = copilotClient;
         }
 
         public async Task<CopilotSession> GetCopilotSessionAsync()
         {
-            var client = new CopilotClient();
-            var session = await client.CreateSessionAsync(_sessionConfig);
+            var session = await _copilotClient.CreateSessionAsync(_sessionConfig);
             return session;
         }
     }

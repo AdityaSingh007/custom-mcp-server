@@ -1,6 +1,9 @@
 ﻿using ChangeLog.mcp.server.Configurations;
 using ChangeLog.mcp.server.Interfaces;
 using ChangeLog.mcp.server.Services;
+using Serilog;
+using Serilog.Events;
+using Serilog.Formatting.Compact;
 
 namespace ChangeLog.mcp.server.Extensions
 {
@@ -10,7 +13,24 @@ namespace ChangeLog.mcp.server.Extensions
         {
             builder.AddServiceDefaults();
 
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Is(ToSerilogLevel(mcpServerSettings.logLevel))
+                .WriteTo.File(
+                    formatter: new CompactJsonFormatter(),
+                    path: Path.Combine(AppContext.BaseDirectory, "logs", "changelog-.json"),
+                    rollingInterval: RollingInterval.Day,
+                    shared: true)
+                .CreateLogger();
+
+            builder.Logging.ClearProviders();
+            builder.Logging.AddSerilog(Log.Logger, dispose: true);
+
             builder.Services.AddSingleton<IChangeLogService, ChangeLogService>();
+            builder.Services.AddHttpClient("BlobServiceClient")
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+                });
 
             if (mcpServerSettings.UseStreamableHttp == true)
             {
@@ -61,16 +81,20 @@ namespace ChangeLog.mcp.server.Extensions
                 .AddUserSecrets<Program>()
                 .AddEnvironmentVariables();
 
-            // Configure all logs to go to stderr for MCP server
-            builder.Logging.AddConsole(consoleLogOptions =>
-            {
-                // Configure all logs to go to stderr
-                consoleLogOptions.LogToStandardErrorThreshold = mcpServerSettings.logLevel;
-            });
-
             var consoleApp = (builder as HostApplicationBuilder)!.Build();
 
             return consoleApp;
         }
+
+        private static LogEventLevel ToSerilogLevel(LogLevel level) => level switch
+        {
+            LogLevel.Trace => LogEventLevel.Verbose,
+            LogLevel.Debug => LogEventLevel.Debug,
+            LogLevel.Information => LogEventLevel.Information,
+            LogLevel.Warning => LogEventLevel.Warning,
+            LogLevel.Error => LogEventLevel.Error,
+            LogLevel.Critical => LogEventLevel.Fatal,
+            _ => LogEventLevel.Information
+        };
     }
 }

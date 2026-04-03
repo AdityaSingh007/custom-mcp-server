@@ -8,11 +8,15 @@ namespace ChangeLog.mcp.server.ChangeLogs
     public class ChangelogTools
     {
         private readonly IConfiguration _configuration;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly ILogger<ChangelogTools> _logger;
 
         // Inject IConfiguration through the constructor
-        public ChangelogTools(IConfiguration configuration)
+        public ChangelogTools(IConfiguration configuration, IHttpClientFactory httpClientFactory, ILogger<ChangelogTools> logger)
         {
             _configuration = configuration;
+            _httpClientFactory = httpClientFactory;
+            _logger = logger;
         }
 
         [McpServerTool(Title = "Get api version changes"), Description(
@@ -26,30 +30,46 @@ namespace ChangeLog.mcp.server.ChangeLogs
         [Description("Provided by the user")] string versionName,
         CancellationToken cancellationToken)
         {
-            var filePath = $"{_configuration["changeLogDirPath"] ?? throw new ArgumentNullException("changeLogDirPath")}\\api-v{versionName}.md";
-            var fileContent = await File.ReadAllTextAsync(filePath, cancellationToken);
-            return [
-            new TextContentBlock
-            {
-                Text="You can find the api version changes below."
-            },
-            //new EmbeddedResourceBlock
-            //{
-            //    Resource = new TextResourceContents()
-            //    {
-            //        Text = fileContent,
-            //        MimeType = "text/markdown",
-            //        Uri = $"api://changelogs/{versionName}"
-            //    }
-            //},
+            _logger.LogInformation("GetVersionChanges started for version {VersionName}", versionName);
 
-            new ResourceLinkBlock
+            try
             {
-                Name = "View raw markdown",
-                MimeType = "text/markdown",
-                Uri = $"api://changelogs/{versionName}"
+                var changeLogDirPath = _configuration["changeLogDirPath"] ?? throw new ArgumentNullException("changeLogDirPath");
+                var filePath = $"{changeLogDirPath}\\api-v{versionName}.md";
+
+                _logger.LogDebug("Resolved changelog file path for version {VersionName}: {FilePath}", versionName, filePath);
+
+                var fileContent = await File.ReadAllTextAsync(filePath, cancellationToken);
+                _logger.LogInformation("Successfully read changelog file for version {VersionName}; content length {ContentLength}", versionName, fileContent.Length);
+
+                return [
+                new TextContentBlock
+                {
+                    Text="You can find the api version changes below."
+                },
+                //new EmbeddedResourceBlock
+                //{
+                //    Resource = new TextResourceContents()
+                //    {
+                //        Text = fileContent,
+                //        MimeType = "text/markdown",
+                //        Uri = $"api://changelogs/{versionName}"
+                //    }
+                //},
+
+                new ResourceLinkBlock
+                {
+                    Name = "View raw markdown",
+                    MimeType = "text/markdown",
+                    Uri = $"api://changelogs/{versionName}"
+                }
+               ];
             }
-           ];
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetVersionChanges failed for version {VersionName}", versionName);
+                throw;
+            }
 
         }
 
@@ -65,33 +85,42 @@ namespace ChangeLog.mcp.server.ChangeLogs
         [Description("Provided by the user")] string versionName,
         CancellationToken cancellationToken)
         {
-            var filePath = $"{_configuration["changeLogDirPath"] ?? throw new ArgumentNullException("changeLogDirPath")}\\swagger-{versionName}.json";
+            _logger.LogInformation("GetVersionChangesAsContent started for version {VersionName}", versionName);
+
             try
             {
-                byte[] fileBytes = await System.IO.File.ReadAllBytesAsync(filePath, cancellationToken);
+                var httpClient = _httpClientFactory.CreateClient("BlobServiceClient");
+                var requestUri = $"https://blobservice/api/v1/FileBlob/{versionName}";
+
+                _logger.LogDebug("Requesting blob content from {RequestUri}", requestUri);
+
+                var response = await httpClient.GetAsync(requestUri, cancellationToken);
+                _logger.LogInformation("BlobService responded with status code {StatusCode} for version {VersionName}", (int)response.StatusCode, versionName);
+                response.EnsureSuccessStatusCode();
+
+                var fileBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+                _logger.LogInformation("Retrieved blob content for version {VersionName}; byte length {ByteLength}; content type {ContentType}",
+                    versionName,
+                    fileBytes.Length,
+                    response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream");
 
                 return new BlobResourceContents
                 {
                     Blob = fileBytes,
-                    MimeType = "application/octet-stream",
-                    Uri = $"file://{filePath}"
+                    MimeType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream",
+                    Uri = $"file://swagger-{versionName}.json"
                 };
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                _logger.LogError(ex, "GetVersionChangesAsContent failed for version {VersionName}", versionName);
                 return new BlobResourceContents
                 {
                     Blob = Array.Empty<byte>(),
                     MimeType = "text/plain",
-                    Uri = $"error://{filePath}"
+                    Uri = $"error://swagger-{versionName}.json"
                 };
             }
-            finally
-            {
-
-            }
-
         }
     }
 }
