@@ -1,18 +1,34 @@
 ﻿using GitHub.Copilot.SDK;
 using Github_Co_Pilot_Local.CoPilot_Client;
 using Microsoft.Extensions.Configuration;
+using System.Text.Json;
 
 await RunAsync();
 
 static async Task RunAsync()
 {
-    var configuration = LoadConfiguration();
-    var mcpServers = GetMcpServers(configuration);
-
-    var copilotClient = new CopilotClient();
+    CopilotClient? copilotClient = null;
 
     try
     {
+        var configuration = LoadConfiguration();
+        var mcpServers = GetMcpServers(configuration);
+        var cliPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "vendor", "copilot", "copilot.exe");
+
+        if (!File.Exists(cliPath))
+        {
+            throw new FileNotFoundException($"Copilot CLI not found at '{cliPath}'.", cliPath);
+        }
+
+        var gitHubToken = Environment.GetEnvironmentVariable("GITHUB_TOKEN", EnvironmentVariableTarget.User)
+            ?? throw new InvalidOperationException("GITHUB_TOKEN environment variable is not set. Please set it in your user environment variables and try again.");
+
+        copilotClient = new CopilotClient(new CopilotClientOptions()
+        {
+            CliPath = cliPath,
+            GitHubToken = gitHubToken,
+        });
+
         await copilotClient.StartAsync();
 
         var sessionConfig = CreateSessionConfig(mcpServers);
@@ -23,22 +39,40 @@ static async Task RunAsync()
 
         await RunInteractiveLoopAsync(session);
     }
-    catch (FileNotFoundException)
-    {
-        Console.WriteLine("Copilot CLI not found. Please install it first.");
-    }
-    catch (HttpRequestException ex) when (ex.Message.Contains("connection", StringComparison.OrdinalIgnoreCase))
-    {
-        Console.WriteLine("Could not connect to Copilot CLI server.");
-    }
     catch (Exception ex)
     {
-        Console.WriteLine($"Unexpected error: {ex.Message}");
+        WriteErrorLine(GetFriendlyErrorMessage(ex));
     }
     finally
     {
-        await copilotClient.StopAsync();
+        if (copilotClient is not null)
+        {
+            await copilotClient.StopAsync();
+        }
     }
+}
+
+static void WriteErrorLine(string message)
+{
+    var previousColor = Console.ForegroundColor;
+    Console.ForegroundColor = ConsoleColor.Red;
+    Console.WriteLine(message);
+    Console.ForegroundColor = previousColor;
+}
+
+static string GetFriendlyErrorMessage(Exception ex)
+{
+    return ex switch
+    {
+        FileNotFoundException fileNotFound => fileNotFound.Message,
+        InvalidOperationException invalidOperation => invalidOperation.Message,
+        UnauthorizedAccessException => "Access was denied. Please check your permissions and try again.",
+        HttpRequestException httpRequestException when httpRequestException.Message.Contains("connection", StringComparison.OrdinalIgnoreCase) =>
+            "Could not connect to Copilot CLI server. Please make sure it is running and try again.",
+        HttpRequestException => "A network error occurred while communicating with Copilot CLI.",
+        JsonException => "The configuration file is invalid. Please check appsettings.json and try again.",
+        _ => $"An unexpected error occurred: {ex.Message}"
+    };
 }
 
 static IConfigurationRoot LoadConfiguration()
@@ -55,7 +89,7 @@ static Dictionary<string, object> GetMcpServers(IConfiguration configuration)
 
     if (mcpServerSettings is null || mcpServerSettings.Count == 0)
     {
-        throw new Exception("Missing mcp server configuration");
+        throw new InvalidOperationException("Missing MCP server configuration in appsettings.json.");
     }
 
     return mcpServerSettings.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value);
@@ -118,11 +152,7 @@ static async Task RunInteractiveLoopAsync(CopilotSession session)
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error: {ex.Message}");
+            WriteErrorLine($"Error: {ex.Message}");
         }
     }
 }
-
-
-
-
