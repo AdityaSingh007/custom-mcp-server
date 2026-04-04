@@ -13,17 +13,12 @@ static async Task RunAsync()
     {
         var configuration = LoadConfiguration();
         var mcpServers = GetMcpServers(configuration);
-        var cliPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "vendor", "copilot", "copilot.exe");
-
-        if (!File.Exists(cliPath))
-        {
-            throw new FileNotFoundException($"Copilot CLI not found at '{cliPath}'.", cliPath);
-        }
 
         var gitHubToken = Environment.GetEnvironmentVariable("GITHUB_TOKEN", EnvironmentVariableTarget.User)
             ?? throw new InvalidOperationException("GITHUB_TOKEN environment variable is not set. Please set it in your user environment variables and try again.");
 
         var cliServerMode = configuration.GetValue("CliServerMode", "local");
+
         if (string.Equals("server", cliServerMode))
         {
             var cliUrl = configuration.GetValue<string>("cliServerUrl");
@@ -39,6 +34,12 @@ static async Task RunAsync()
         }
         else
         {
+            var cliPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "vendor", "copilot", "copilot.exe");
+
+            if (!File.Exists(cliPath))
+            {
+                throw new FileNotFoundException($"Copilot CLI not found at '{cliPath}'.", cliPath);
+            }
             copilotClient = new CopilotClient(new CopilotClientOptions()
             {
                 CliPath = cliPath,
