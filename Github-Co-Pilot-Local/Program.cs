@@ -60,14 +60,6 @@ static void WriteErrorLine(string message)
     Console.ForegroundColor = previousColor;
 }
 
-static void WriteThinkingLine(string message)
-{
-    var previousColor = Console.ForegroundColor;
-    Console.ForegroundColor = ConsoleColor.Yellow;
-    Console.Write(message);
-    Console.ForegroundColor = previousColor;
-}
-
 static async Task RunThinkingSpinnerAsync(CancellationToken cancellationToken)
 {
     var frames = new[] { "|", "/", "-", "\\" };
