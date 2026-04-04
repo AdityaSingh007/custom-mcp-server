@@ -34,7 +34,7 @@ namespace ChangeLog.mcp.server.Extensions
 
             if (mcpServerSettings.UseStreamableHttp == true)
             {
-                //(builder as WebApplicationBuilder)?.WebHost.UseUrls(mcpServerSettings.ServerUrl);
+                //(builder as WebApplicationBuilder)!.WebHost.UseUrls("http://localhost:5000", "https://localhost:5001");
 
                 builder.Services.AddMcpServer()
                                 .WithHttpTransport(o => o.Stateless = mcpServerSettings.IsStateless)

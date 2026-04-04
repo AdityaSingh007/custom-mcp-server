@@ -60,6 +60,37 @@ static void WriteErrorLine(string message)
     Console.ForegroundColor = previousColor;
 }
 
+static void WriteThinkingLine(string message)
+{
+    var previousColor = Console.ForegroundColor;
+    Console.ForegroundColor = ConsoleColor.Yellow;
+    Console.Write(message);
+    Console.ForegroundColor = previousColor;
+}
+
+static async Task RunThinkingSpinnerAsync(CancellationToken cancellationToken)
+{
+    var frames = new[] { "|", "/", "-", "\\" };
+    var index = 0;
+
+    while (!cancellationToken.IsCancellationRequested)
+    {
+        var previousColor = Console.ForegroundColor;
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.Write($"\rThinking... {frames[index++ % frames.Length]} ");
+        Console.ForegroundColor = previousColor;
+
+        try
+        {
+            await Task.Delay(20, cancellationToken);
+        }
+        catch (TaskCanceledException)
+        {
+            break;
+        }
+    }
+}
+
 static string GetFriendlyErrorMessage(Exception ex)
 {
     return ex switch
@@ -115,13 +146,16 @@ static IDisposable RegisterSessionEventHandlers(CopilotSession session)
         switch (evt)
         {
             case AssistantReasoningEvent reasoning:
-                Console.WriteLine($"[reasoning: {reasoning.Data.Content}]");
+                Console.WriteLine($"\n[reasoning: {reasoning.Data.Content}]");
                 break;
             case ToolExecutionStartEvent toolStart:
-                Console.WriteLine($"  → Running: {toolStart.Data.ToolName} ({toolStart.Data.ToolCallId})");
+                Console.WriteLine($"\nRunning: {toolStart.Data.ToolName} ({toolStart.Data.ToolCallId})\n");
                 break;
             case ToolExecutionCompleteEvent toolEnd:
-                Console.WriteLine($"  ✓ Completed: {toolEnd.Data.ToolCallId}");
+                Console.WriteLine($"\nCompleted: {toolEnd.Data.ToolCallId}\n");
+                break;
+            case SessionIdleEvent sessionIdle:
+                Console.WriteLine($"\nRequest completed\n");
                 break;
         }
 
@@ -141,18 +175,32 @@ static async Task RunInteractiveLoopAsync(CopilotSession session)
             break;
         }
 
+        var spinnerCts = new CancellationTokenSource();
+        var spinnerTask = RunThinkingSpinnerAsync(spinnerCts.Token);
+
         try
         {
             var reply = await session.SendAndWaitAsync(
                 new MessageOptions { Prompt = input },
                 timeout: TimeSpan.FromMinutes(5));
 
+            spinnerCts.Cancel();
+            await spinnerTask;
+            Console.WriteLine();
+
             Console.Clear();
             Console.WriteLine($"{reply?.Data.Content}\n");
         }
         catch (Exception ex)
         {
+            spinnerCts.Cancel();
+            await spinnerTask;
+            Console.WriteLine();
             WriteErrorLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            spinnerCts.Dispose();
         }
     }
 }
