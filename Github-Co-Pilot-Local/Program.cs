@@ -23,12 +23,28 @@ static async Task RunAsync()
         var gitHubToken = Environment.GetEnvironmentVariable("GITHUB_TOKEN", EnvironmentVariableTarget.User)
             ?? throw new InvalidOperationException("GITHUB_TOKEN environment variable is not set. Please set it in your user environment variables and try again.");
 
-        copilotClient = new CopilotClient(new CopilotClientOptions()
+        var cliServerMode = configuration.GetValue("CliServerMode", "local");
+        if (string.Equals("server", cliServerMode))
         {
-            CliPath = cliPath,
-            GitHubToken = gitHubToken,
-        });
-
+            var cliUrl = configuration.GetValue<string>("cliServerUrl");
+            if (string.IsNullOrWhiteSpace(cliUrl))
+            {
+                throw new InvalidOperationException("cliServerUrl configuration is required when CliServerMode is set to 'server'. Please check your appsettings.json and try again.");
+            }
+            copilotClient = new CopilotClient(new CopilotClientOptions()
+            {
+                CliUrl = cliUrl,
+                GitHubToken = gitHubToken,
+            });
+        }
+        else
+        {
+            copilotClient = new CopilotClient(new CopilotClientOptions()
+            {
+                CliPath = cliPath,
+                GitHubToken = gitHubToken,
+            });
+        }
         await copilotClient.StartAsync();
 
         var sessionConfig = CreateSessionConfig(mcpServers);
