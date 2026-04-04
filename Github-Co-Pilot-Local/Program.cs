@@ -29,7 +29,6 @@ static async Task RunAsync()
             copilotClient = new CopilotClient(new CopilotClientOptions()
             {
                 CliUrl = cliUrl,
-                GitHubToken = gitHubToken,
             });
         }
         else
@@ -142,7 +141,7 @@ static SessionConfig CreateSessionConfig(Dictionary<string, object> mcpServers)
         Model = "GPT-5.4",
         Streaming = true,
         OnPermissionRequest = PermissionHandler.ApproveAll,
-        McpServers = mcpServers,
+        //McpServers = mcpServers,
     };
 }
 
