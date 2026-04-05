@@ -1,9 +1,42 @@
 ﻿using GitHub.Copilot.SDK;
 using Github_Co_Pilot_Local.CoPilot_Client;
+using Github_Co_Pilot_Local.LocalTools;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
+using Serilog;
+using Serilog.Events;
+using Serilog.Formatting.Compact;
 using System.Text.Json;
 
-await RunAsync();
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("System", LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("Application", "Github-Co-Pilot-Local")
+    .WriteTo.File(
+        formatter: new CompactJsonFormatter(),
+        path: Path.Combine(AppContext.BaseDirectory, "logs", "github-copilot-local-.json"),
+        rollingInterval: RollingInterval.Day,
+        shared: true)
+    .CreateLogger();
+
+try
+{
+    Log.Information("Application starting");
+    await RunAsync();
+    Log.Information("Application finished successfully");
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+    WriteErrorLine(GetFriendlyErrorMessage(ex));
+}
+finally
+{
+    Log.Information("Flushing logs and shutting down");
+    Log.CloseAndFlush();
+}
 
 static async Task RunAsync()
 {
@@ -11,21 +44,29 @@ static async Task RunAsync()
 
     try
     {
+        Log.Information("Loading configuration");
         var configuration = LoadConfiguration();
+        var customTools = new CustomTools(configuration, Log.ForContext<CustomTools>());
+        Log.Information("Custom tools initialized");
+
         var mcpServers = GetMcpServers(configuration);
+        Log.Information("Loaded {McpServerCount} MCP server configuration(s)", mcpServers.Count);
 
         var gitHubToken = Environment.GetEnvironmentVariable("GITHUB_TOKEN", EnvironmentVariableTarget.User)
             ?? throw new InvalidOperationException("GITHUB_TOKEN environment variable is not set. Please set it in your user environment variables and try again.");
 
         var cliServerMode = configuration.GetValue("CliServerMode", "local");
+        Log.Information("CLI server mode resolved to {CliServerMode}", cliServerMode);
 
-        if (string.Equals("server", cliServerMode))
+        if (string.Equals("server", cliServerMode, StringComparison.OrdinalIgnoreCase))
         {
             var cliUrl = configuration.GetValue<string>("cliServerUrl");
             if (string.IsNullOrWhiteSpace(cliUrl))
             {
                 throw new InvalidOperationException("cliServerUrl configuration is required when CliServerMode is set to 'server'. Please check your appsettings.json and try again.");
             }
+
+            Log.Information("Using Copilot CLI server at {CliUrl}", cliUrl);
             copilotClient = new CopilotClient(new CopilotClientOptions()
             {
                 CliUrl = cliUrl,
@@ -34,36 +75,51 @@ static async Task RunAsync()
         else
         {
             var cliPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "vendor", "copilot", "copilot.exe");
+            Log.Information("Using local Copilot CLI at {CliPath}", cliPath);
 
             if (!File.Exists(cliPath))
             {
                 throw new FileNotFoundException($"Copilot CLI not found at '{cliPath}'.", cliPath);
             }
+
             copilotClient = new CopilotClient(new CopilotClientOptions()
             {
                 CliPath = cliPath,
                 GitHubToken = gitHubToken,
             });
         }
-        await copilotClient.StartAsync();
 
-        var sessionConfig = CreateSessionConfig(mcpServers);
+        Log.Information("Starting Copilot client");
+        await copilotClient.StartAsync();
+        Log.Information("Copilot client started");
+
+        var isServerMode = string.Equals("server", cliServerMode, StringComparison.OrdinalIgnoreCase);
+        var sessionConfig = CreateSessionConfig(mcpServers, customTools.Tools, isServerMode: isServerMode);
+        Log.Information("Session configuration created for {Mode} mode", isServerMode ? "server" : "local");
+
         var coPilotService = new CoPilotService(sessionConfig, copilotClient);
+        Log.Information("Copilot service created");
 
         await using var session = await coPilotService.GetCopilotSessionAsync();
+        Log.Information("Copilot session opened");
+
         using var subscription = RegisterSessionEventHandlers(session);
 
         await RunInteractiveLoopAsync(session);
+        Log.Information("Interactive loop exited");
     }
     catch (Exception ex)
     {
+        Log.Error(ex, "RunAsync failed");
         WriteErrorLine(GetFriendlyErrorMessage(ex));
     }
     finally
     {
         if (copilotClient is not null)
         {
+            Log.Information("Stopping Copilot client");
             await copilotClient.StopAsync();
+            Log.Information("Copilot client stopped");
         }
     }
 }
@@ -116,6 +172,8 @@ static string GetFriendlyErrorMessage(Exception ex)
 
 static IConfigurationRoot LoadConfiguration()
 {
+    Log.Debug("Loading appsettings.json from {CurrentDirectory}", Directory.GetCurrentDirectory());
+
     return new ConfigurationBuilder()
         .SetBasePath(Directory.GetCurrentDirectory())
         .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
@@ -131,22 +189,45 @@ static Dictionary<string, object> GetMcpServers(IConfiguration configuration)
         throw new InvalidOperationException("Missing MCP server configuration in appsettings.json.");
     }
 
+    Log.Debug("MCP servers found: {McpServerNames}", string.Join(", ", mcpServerSettings.Keys));
+
     return mcpServerSettings.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value);
 }
 
-static SessionConfig CreateSessionConfig(Dictionary<string, object> mcpServers)
+static SessionConfig CreateSessionConfig(Dictionary<string, object> mcpServers, AIFunction[] tools, bool isServerMode = false)
 {
-    return new SessionConfig
+    Log.Debug(
+        "Creating session config. IsServerMode={IsServerMode}, ToolCount={ToolCount}, McpServerCount={McpServerCount}",
+        isServerMode,
+        tools.Length,
+        mcpServers.Count);
+
+    if (isServerMode)
     {
-        Model = "GPT-5.4",
-        Streaming = true,
-        OnPermissionRequest = PermissionHandler.ApproveAll,
-        McpServers = mcpServers,
-    };
+        return new SessionConfig
+        {
+            Model = "GPT-5.4",
+            Streaming = true,
+            OnPermissionRequest = PermissionHandler.ApproveAll,
+            Tools = tools
+        };
+    }
+    else
+    {
+        return new SessionConfig
+        {
+            Model = "GPT-5.4",
+            Streaming = true,
+            OnPermissionRequest = PermissionHandler.ApproveAll,
+            McpServers = mcpServers,
+        };
+    }
 }
 
 static IDisposable RegisterSessionEventHandlers(CopilotSession session)
 {
+    Log.Debug("Registering session event handlers");
+
     return session.On(evt =>
     {
         Console.ForegroundColor = ConsoleColor.Blue;
@@ -154,16 +235,20 @@ static IDisposable RegisterSessionEventHandlers(CopilotSession session)
         switch (evt)
         {
             case AssistantReasoningEvent reasoning:
+                Log.Debug("Assistant reasoning event received");
                 Console.WriteLine($"\n[reasoning: {reasoning.Data.Content}]");
                 break;
             case ToolExecutionStartEvent toolStart:
+                Log.Information("Tool execution started: {ToolName} ({ToolCallId})", toolStart.Data.ToolName, toolStart.Data.ToolCallId);
                 Console.WriteLine($"\nRunning: {toolStart.Data.ToolName} ({toolStart.Data.ToolCallId})\n");
                 break;
             case ToolExecutionCompleteEvent toolEnd:
+                Log.Information("Tool execution completed: {ToolCallId}", toolEnd.Data.ToolCallId);
                 Console.WriteLine($"\nCompleted: {toolEnd.Data.ToolCallId}\n");
                 break;
-            case SessionIdleEvent sessionIdle:
-                Console.WriteLine($"\nRequest completed\n");
+            case SessionIdleEvent:
+                Log.Information("Session idle; request completed");
+                Console.WriteLine("\nRequest completed\n");
                 break;
         }
 
@@ -173,6 +258,8 @@ static IDisposable RegisterSessionEventHandlers(CopilotSession session)
 
 static async Task RunInteractiveLoopAsync(CopilotSession session)
 {
+    Log.Information("Interactive loop started");
+
     while (true)
     {
         Console.Write("You: ");
@@ -180,14 +267,18 @@ static async Task RunInteractiveLoopAsync(CopilotSession session)
 
         if (string.IsNullOrWhiteSpace(input) || input.Equals("exit", StringComparison.OrdinalIgnoreCase))
         {
+            Log.Information("Interactive loop exit requested by user");
             break;
         }
+
+        Log.Information("User input received; length={InputLength}", input.Length);
 
         var spinnerCts = new CancellationTokenSource();
         var spinnerTask = RunThinkingSpinnerAsync(spinnerCts.Token);
 
         try
         {
+            Log.Information("Sending prompt to Copilot session");
             var reply = await session.SendAndWaitAsync(
                 new MessageOptions { Prompt = input },
                 timeout: TimeSpan.FromMinutes(5));
@@ -195,6 +286,9 @@ static async Task RunInteractiveLoopAsync(CopilotSession session)
             spinnerCts.Cancel();
             await spinnerTask;
             Console.WriteLine();
+
+            var responseLength = reply?.Data.Content?.Length ?? 0;
+            Log.Information("Copilot response received; length={ResponseLength}", responseLength);
 
             Console.Clear();
             Console.WriteLine($"{reply?.Data.Content}\n");
@@ -204,6 +298,8 @@ static async Task RunInteractiveLoopAsync(CopilotSession session)
             spinnerCts.Cancel();
             await spinnerTask;
             Console.WriteLine();
+
+            Log.Error(ex, "Failed to process user prompt");
             WriteErrorLine($"Error: {ex.Message}");
         }
         finally
@@ -211,4 +307,6 @@ static async Task RunInteractiveLoopAsync(CopilotSession session)
             spinnerCts.Dispose();
         }
     }
+
+    Log.Information("Interactive loop ended");
 }
