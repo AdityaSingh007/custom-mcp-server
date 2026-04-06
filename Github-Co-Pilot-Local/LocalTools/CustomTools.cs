@@ -16,7 +16,8 @@ namespace Github_Co_Pilot_Local.LocalTools
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             _logger.Debug("Initializing {ToolType}", nameof(CustomTools));
-            Tools = [AIFunctionFactory.Create(GetVersionChangesAsContent)];
+            Tools = [AIFunctionFactory.Create(GetVersionChangesAsContent),
+                     AIFunctionFactory.Create(GetPackageInformation)];
             _logger.Information("Registered {ToolCount} AI tool(s)", Tools.Length);
         }
 
@@ -72,6 +73,58 @@ namespace Github_Co_Pilot_Local.LocalTools
             _logger.Information(
                 "Successfully read swagger file for version {FileVersion}; bytesRead={BytesRead}",
                 fileVersion,
+                content.Length);
+
+            return content;
+        }
+
+        [Description(
+"""
+        Get the list of installed packages along with their version names.
+        Use this tool when the user asks for installed packages, dependencies, package inventory, or package versions.
+        The tool reads from a file that contains the packages and their version names.
+        Extract only the packages intended for the production environment.
+        Present the response to the user in a client-facing tabular format.
+        """)]
+        private byte[] GetPackageInformation()
+        {
+            _logger.Information("GetPackageInformation started");
+
+            var directoryPath = _configuration["AppPackageDirectoryPath"]
+               ?? throw new InvalidOperationException("AppPackageDirectoryPath configuration is missing");
+
+            if (string.IsNullOrWhiteSpace(directoryPath))
+            {
+                throw new InvalidOperationException("AppPackageDirectoryPath configuration is empty");
+            }
+
+            _logger.Debug("Resolved package directory path {DirectoryPath}", directoryPath);
+
+            if (!Directory.Exists(directoryPath))
+            {
+                _logger.Error("Configured package directory does not exist: {DirectoryPath}", directoryPath);
+                throw new DirectoryNotFoundException($"Directory not found: {directoryPath}");
+            }
+
+            var filePath = Path.Combine(directoryPath, "package.json");
+
+            if (!File.Exists(filePath))
+            {
+                _logger.Error("Package file not found at {FilePath}", filePath);
+                throw new FileNotFoundException($"Package file not found: {filePath}", filePath);
+            }
+
+            var fileInfo = new FileInfo(filePath);
+            _logger.Information(
+                "Reading package file; path={FilePath}; size={FileSize} bytes; lastModified={LastModifiedUtc}",
+                filePath,
+                fileInfo.Length,
+                fileInfo.LastWriteTimeUtc);
+
+            var content = File.ReadAllBytes(filePath);
+
+            _logger.Information(
+                "Successfully read package file; bytesRead={BytesRead}",
                 content.Length);
 
             return content;
