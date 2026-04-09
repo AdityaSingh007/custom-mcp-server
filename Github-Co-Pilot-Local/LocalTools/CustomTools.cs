@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Serilog;
 using System.ComponentModel;
+using System.Text;
 
 namespace Github_Co_Pilot_Local.LocalTools
 {
@@ -18,7 +19,8 @@ namespace Github_Co_Pilot_Local.LocalTools
             _logger.Debug("Initializing {ToolType}", nameof(CustomTools));
             Tools = [AIFunctionFactory.Create(GetVersionChangesAsContent),
                      AIFunctionFactory.Create(GetPackageInformation), 
-                     AIFunctionFactory.Create(GetLicenseFromNodeModules)];
+                     AIFunctionFactory.Create(GetLicenseFromNodeModules),
+                     AIFunctionFactory.Create(GetCoPilotLogInformation)];
             _logger.Information("Registered {ToolCount} AI tool(s)", Tools.Length);
         }
 
@@ -36,47 +38,60 @@ namespace Github_Co_Pilot_Local.LocalTools
         {
             if (string.IsNullOrWhiteSpace(fileVersion))
             {
-                throw new ArgumentException("A version value is required.", nameof(fileVersion));
+                _logger.Error("GetVersionChangesAsContent called without a version value");
+                return Encoding.UTF8.GetBytes("A version value is required to read the Swagger file.");
             }
 
-            _logger.Information("GetVersionChangesAsContent started for version {FileVersion}", fileVersion);
-
-            var directoryPath = _configuration["LocalBlobStoragePath"]
-                ?? throw new ArgumentNullException("LocalBlobStoragePath");
-
-            if (!Directory.Exists(directoryPath))
+            try
             {
-                _logger.Error("Configured swagger directory does not exist: {DirectoryPath}", directoryPath);
-                throw new DirectoryNotFoundException($"Directory not found: {directoryPath}");
+                _logger.Information("GetVersionChangesAsContent started for version {FileVersion}", fileVersion);
+
+                var directoryPath = _configuration["LocalBlobStoragePath"];
+                if (string.IsNullOrWhiteSpace(directoryPath))
+                {
+                    _logger.Error("LocalBlobStoragePath configuration is missing or empty");
+                    return Encoding.UTF8.GetBytes("Swagger file location is not configured.");
+                }
+
+                if (!Directory.Exists(directoryPath))
+                {
+                    _logger.Error("Configured swagger directory does not exist: {DirectoryPath}", directoryPath);
+                    return Encoding.UTF8.GetBytes($"Swagger directory was not found: {directoryPath}");
+                }
+
+                var fileName = $"swagger-{fileVersion}.json";
+                var filePath = Path.Combine(directoryPath, fileName);
+
+                _logger.Debug("Resolved swagger file path {FilePath}", filePath);
+
+                if (!File.Exists(filePath))
+                {
+                    _logger.Warning("Swagger file not found for version {FileVersion} at {FilePath}", fileVersion, filePath);
+                    return Encoding.UTF8.GetBytes($"Swagger file was not found for version {fileVersion}.");
+                }
+
+                var fileInfo = new FileInfo(filePath);
+                _logger.Information(
+                    "Reading swagger file for version {FileVersion}; path={FilePath}; size={FileSize} bytes; lastModified={LastModifiedUtc}",
+                    fileVersion,
+                    filePath,
+                    fileInfo.Length,
+                    fileInfo.LastWriteTimeUtc);
+
+                var content = await File.ReadAllBytesAsync(filePath);
+
+                _logger.Information(
+                    "Successfully read swagger file for version {FileVersion}; bytesRead={BytesRead}",
+                    fileVersion,
+                    content.Length);
+
+                return content;
             }
-
-            var fileName = $"swagger-{fileVersion}.json";
-            var filePath = Path.Combine(directoryPath, fileName);
-
-            _logger.Debug("Resolved swagger file path {FilePath}", filePath);
-
-            if (!File.Exists(filePath))
+            catch (Exception ex)
             {
-                _logger.Warning("Swagger file not found for version {FileVersion} at {FilePath}", fileVersion, filePath);
-                throw new FileNotFoundException($"Swagger file not found: {filePath}", filePath);
+                _logger.Error(ex, "Failed to read swagger file for version {FileVersion}", fileVersion);
+                return Encoding.UTF8.GetBytes($"Unable to read Swagger file for version {fileVersion}.");
             }
-
-            var fileInfo = new FileInfo(filePath);
-            _logger.Information(
-                "Reading swagger file for version {FileVersion}; path={FilePath}; size={FileSize} bytes; lastModified={LastModifiedUtc}",
-                fileVersion,
-                filePath,
-                fileInfo.Length,
-                fileInfo.LastWriteTimeUtc);
-
-            var content = await File.ReadAllBytesAsync(filePath);
-
-            _logger.Information(
-                "Successfully read swagger file for version {FileVersion}; bytesRead={BytesRead}",
-                fileVersion,
-                content.Length);
-
-            return content;
         }
 
         [Description(
@@ -89,46 +104,53 @@ namespace Github_Co_Pilot_Local.LocalTools
         """)]
         private async Task<byte[]> GetPackageInformation()
         {
-            _logger.Information("GetPackageInformation started");
-
-            var directoryPath = _configuration["AppPackageDirectoryPath"]
-               ?? throw new InvalidOperationException("AppPackageDirectoryPath configuration is missing");
-
-            if (string.IsNullOrWhiteSpace(directoryPath))
+            try
             {
-                throw new InvalidOperationException("AppPackageDirectoryPath configuration is empty");
+                _logger.Information("GetPackageInformation started");
+
+                var directoryPath = _configuration["AppPackageDirectoryPath"];
+                if (string.IsNullOrWhiteSpace(directoryPath))
+                {
+                    _logger.Error("AppPackageDirectoryPath configuration is missing or empty");
+                    return Encoding.UTF8.GetBytes("Package directory configuration is missing.");
+                }
+
+                _logger.Debug("Resolved package directory path {DirectoryPath}", directoryPath);
+
+                if (!Directory.Exists(directoryPath))
+                {
+                    _logger.Error("Configured package directory does not exist: {DirectoryPath}", directoryPath);
+                    return Encoding.UTF8.GetBytes($"Package directory was not found: {directoryPath}");
+                }
+
+                var filePath = Path.Combine(directoryPath, "package.json");
+
+                if (!File.Exists(filePath))
+                {
+                    _logger.Error("Package file not found at {FilePath}", filePath);
+                    return Encoding.UTF8.GetBytes($"Package file was not found: {filePath}");
+                }
+
+                var fileInfo = new FileInfo(filePath);
+                _logger.Information(
+                    "Reading package file; path={FilePath}; size={FileSize} bytes; lastModified={LastModifiedUtc}",
+                    filePath,
+                    fileInfo.Length,
+                    fileInfo.LastWriteTimeUtc);
+
+                var content = await File.ReadAllBytesAsync(filePath);
+
+                _logger.Information(
+                    "Successfully read package file; bytesRead={BytesRead}",
+                    content.Length);
+
+                return content;
             }
-
-            _logger.Debug("Resolved package directory path {DirectoryPath}", directoryPath);
-
-            if (!Directory.Exists(directoryPath))
+            catch (Exception ex)
             {
-                _logger.Error("Configured package directory does not exist: {DirectoryPath}", directoryPath);
-                throw new DirectoryNotFoundException($"Directory not found: {directoryPath}");
+                _logger.Error(ex, "Failed to read package information");
+                return Encoding.UTF8.GetBytes("Unable to read package information.");
             }
-
-            var filePath = Path.Combine(directoryPath, "package.json");
-
-            if (!File.Exists(filePath))
-            {
-                _logger.Error("Package file not found at {FilePath}", filePath);
-                throw new FileNotFoundException($"Package file not found: {filePath}", filePath);
-            }
-
-            var fileInfo = new FileInfo(filePath);
-            _logger.Information(
-                "Reading package file; path={FilePath}; size={FileSize} bytes; lastModified={LastModifiedUtc}",
-                filePath,
-                fileInfo.Length,
-                fileInfo.LastWriteTimeUtc);
-
-            var content = await File.ReadAllBytesAsync(filePath);
-
-            _logger.Information(
-                "Successfully read package file; bytesRead={BytesRead}",
-                content.Length);
-
-            return content;
         }
 
         [Description(
@@ -143,94 +165,157 @@ namespace Github_Co_Pilot_Local.LocalTools
         {
             if (string.IsNullOrWhiteSpace(packageName))
             {
-                throw new ArgumentException("Package name is required.", nameof(packageName));
+                _logger.Error("GetLicenseFromNodeModules called without a package name");
+                return "A package name is required to search for license information.";
             }
 
-            var nodeModulesDirectoryPath = _configuration["NodeModulesDirectoryPath"]
-                ?? throw new InvalidOperationException("NodeModulesDirectoryPath configuration is missing");
-
-            if (string.IsNullOrWhiteSpace(nodeModulesDirectoryPath))
+            try
             {
-                throw new InvalidOperationException("NodeModulesDirectoryPath configuration is empty");
-            }
-
-            if (!Directory.Exists(nodeModulesDirectoryPath))
-            {
-                _logger.Error("Configured node_modules directory does not exist: {DirectoryPath}", nodeModulesDirectoryPath);
-                throw new DirectoryNotFoundException($"Directory not found: {nodeModulesDirectoryPath}");
-            }
-
-            _logger.Information(
-                "Searching node_modules for package {PackageName} under {DirectoryPath}",
-                packageName,
-                nodeModulesDirectoryPath);
-
-            var packageDirectoryComponents = packageName.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            if (packageDirectoryComponents.Length == 0)
-            {
-                throw new ArgumentException("Package name is required.", nameof(packageName));
-            }
-
-            var packageDirectoryNameTop = packageDirectoryComponents[0];
-            var packageDirectoryNameSub = packageDirectoryComponents.Length > 1
-                ? packageDirectoryComponents[^1]
-                : packageDirectoryComponents[0];
-
-            _logger.Debug(
-                "Resolved package search segments. Top={PackageDirectoryNameTop}, Sub={PackageDirectoryNameSub}",
-                packageDirectoryNameTop,
-                packageDirectoryNameSub);
-
-            var topLevelDirectory = Directory.EnumerateDirectories(nodeModulesDirectoryPath, "*", SearchOption.AllDirectories)
-                .FirstOrDefault(directory =>
-                    string.Equals(Path.GetFileName(directory), packageDirectoryNameTop, StringComparison.OrdinalIgnoreCase));
-
-            if (topLevelDirectory is null)
-            {
-                _logger.Warning(
-                    "Package top-level directory not found for {PackageName}; searched for {PackageDirectoryNameTop}",
-                    packageName,
-                    packageDirectoryNameTop);
-                return string.Empty;
-            }
-
-            _logger.Information("Matched top-level package directory: {TopLevelDirectory}", topLevelDirectory);
-
-            var packageDirectory = packageDirectoryComponents.Length > 1
-                ? Path.Combine(topLevelDirectory, packageDirectoryNameSub)
-                : topLevelDirectory;
-
-            if (!Directory.Exists(packageDirectory))
-            {
-                _logger.Warning(
-                    "Package subdirectory not found for {PackageName}; expected {PackageDirectory}",
-                    packageName,
-                    packageDirectory);
-                return string.Empty;
-            }
-
-            _logger.Information("Searching for license files under {PackageDirectory}", packageDirectory);
-
-            var licenseFile = Directory.EnumerateFiles(packageDirectory, "*", SearchOption.AllDirectories)
-                .FirstOrDefault(file =>
+                var nodeModulesDirectoryPath = _configuration["NodeModulesDirectoryPath"];
+                if (string.IsNullOrWhiteSpace(nodeModulesDirectoryPath))
                 {
-                    var fileName = Path.GetFileName(file);
-                    return fileName.StartsWith("license", StringComparison.OrdinalIgnoreCase) ||
-                           fileName.StartsWith("copying", StringComparison.OrdinalIgnoreCase);
-                });
+                    _logger.Error("NodeModulesDirectoryPath configuration is missing or empty");
+                    return "NodeModulesDirectoryPath configuration is missing.";
+                }
 
-            if (licenseFile is null)
+                if (!Directory.Exists(nodeModulesDirectoryPath))
+                {
+                    _logger.Error("Configured node_modules directory does not exist: {DirectoryPath}", nodeModulesDirectoryPath);
+                    return $"node_modules directory was not found: {nodeModulesDirectoryPath}";
+                }
+
+                _logger.Information(
+                    "Searching node_modules for package {PackageName} under {DirectoryPath}",
+                    packageName,
+                    nodeModulesDirectoryPath);
+
+                var packageDirectoryComponents = packageName.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (packageDirectoryComponents.Length == 0)
+                {
+                    _logger.Error("Invalid package name provided to GetLicenseFromNodeModules: {PackageName}", packageName);
+                    return "A valid package name is required.";
+                }
+
+                var packageDirectoryNameTop = packageDirectoryComponents[0];
+                var packageDirectoryNameSub = packageDirectoryComponents.Length > 1
+                    ? packageDirectoryComponents[^1]
+                    : packageDirectoryComponents[0];
+
+                _logger.Debug(
+                    "Resolved package search segments. Top={PackageDirectoryNameTop}, Sub={PackageDirectoryNameSub}",
+                    packageDirectoryNameTop,
+                    packageDirectoryNameSub);
+
+                var topLevelDirectory = Directory.EnumerateDirectories(nodeModulesDirectoryPath, "*", SearchOption.AllDirectories)
+                    .FirstOrDefault(directory =>
+                        string.Equals(Path.GetFileName(directory), packageDirectoryNameTop, StringComparison.OrdinalIgnoreCase));
+
+                if (topLevelDirectory is null)
+                {
+                    _logger.Warning(
+                        "Package top-level directory not found for {PackageName}; searched for {PackageDirectoryNameTop}",
+                        packageName,
+                        packageDirectoryNameTop);
+                    return $"Package '{packageName}' was not found in node_modules.";
+                }
+
+                _logger.Information("Matched top-level package directory: {TopLevelDirectory}", topLevelDirectory);
+
+                var packageDirectory = packageDirectoryComponents.Length > 1
+                    ? Path.Combine(topLevelDirectory, packageDirectoryNameSub)
+                    : topLevelDirectory;
+
+                if (!Directory.Exists(packageDirectory))
+                {
+                    _logger.Warning(
+                        "Package subdirectory not found for {PackageName}; expected {PackageDirectory}",
+                        packageName,
+                        packageDirectory);
+                    return $"Package directory for '{packageName}' was not found.";
+                }
+
+                _logger.Information("Searching for license files under {PackageDirectory}", packageDirectory);
+
+                var licenseFile = Directory.EnumerateFiles(packageDirectory, "*", SearchOption.AllDirectories)
+                    .FirstOrDefault(file =>
+                    {
+                        var fileName = Path.GetFileName(file);
+                        return fileName.StartsWith("license", StringComparison.OrdinalIgnoreCase) ||
+                               fileName.StartsWith("copying", StringComparison.OrdinalIgnoreCase);
+                    });
+
+                if (licenseFile is null)
+                {
+                    _logger.Warning("No license file found under package directory {PackageDirectory}", packageDirectory);
+                    return $"No license file was found for package '{packageName}'.";
+                }
+
+                _logger.Information("License file found for {PackageName}: {LicenseFile}", packageName, licenseFile);
+
+                var licenseContent = await File.ReadAllTextAsync(licenseFile);
+                _logger.Debug("Read license file content for {PackageName}; length={Length}", packageName, licenseContent.Length);
+
+                return licenseContent;
+            }
+            catch (Exception ex)
             {
-                _logger.Warning("No license file found under package directory {PackageDirectory}", packageDirectory);
-                return string.Empty;
+                _logger.Error(ex, "Failed to read license information for package {PackageName}", packageName);
+                return $"Unable to read license information for package '{packageName}'.";
+            }
+        }
+
+        [Description(
+"""
+        Get Copilot log information for a specific day.
+        Use this tool when the user asks to search, inspect, or review Copilot logs by day.
+        Provide the day number as input, and return the matching log content for that day in a client-facing format.
+        """)]
+        private async Task<string> GetCoPilotLogInformation(string date)
+        {
+            if (string.IsNullOrWhiteSpace(date))
+            {
+                _logger.Error("GetCoPilotLogInformation called without a date value");
+                return "A day or date value is required to search Copilot logs.";
             }
 
-            _logger.Information("License file found for {PackageName}: {LicenseFile}", packageName, licenseFile);
+            try
+            {
+                if (!DateTime.TryParse(date, out var targetDate))
+                {
+                    _logger.Error("Invalid day/date input provided to GetCoPilotLogInformation: {DateValue}", date);
+                    return "Invalid date value was provided. Please provide a valid day or date to search Copilot logs.";
+                }
 
-            var licenseContent = await File.ReadAllTextAsync(licenseFile);
-            _logger.Debug("Read license file content for {PackageName}; length={Length}", packageName, licenseContent.Length);
+                var logDate = targetDate.ToString("yyyyMMdd");
+                var logFilePath = Path.Combine(AppContext.BaseDirectory, "logs", $"github-copilot-local-{logDate}.json");
 
-            return licenseContent;
+                _logger.Information(
+                    "GetCoPilotLogInformation started for day {Day}; resolved date {LogDate}; path {LogFilePath}",
+                    date,
+                    logDate,
+                    logFilePath);
+
+                if (!File.Exists(logFilePath))
+                {
+                    _logger.Warning("Log file not found for day {Day} at {LogFilePath}", date, logFilePath);
+                    return $"No Copilot log file was found for the requested day ({date}). Expected file: {Path.GetFileName(logFilePath)}";
+                }
+
+                var logContent = await File.ReadAllTextAsync(logFilePath);
+
+                _logger.Information(
+                    "Successfully read Copilot log file for day {Day}; bytesRead={BytesRead}",
+                    date,
+                    logContent.Length);
+
+                return logContent;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Failed to read Copilot logs for day {Day}", date);
+                return "Unable to read Copilot logs for the requested day due to an unexpected error. Please verify the date and try again.";
+            }
+
         }
     }
 }
