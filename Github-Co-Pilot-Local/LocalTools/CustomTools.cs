@@ -2,7 +2,6 @@
 using Microsoft.Extensions.Configuration;
 using Serilog;
 using System.ComponentModel;
-using System.Text.Json;
 
 namespace Github_Co_Pilot_Local.LocalTools
 {
@@ -33,7 +32,7 @@ namespace Github_Co_Pilot_Local.LocalTools
         Prompt for the version unless they provided it already. 
         Present the response to the user in a client-facing format.
         """)]
-        private byte[] GetVersionChangesAsContent(string fileVersion)
+        private async Task<byte[]> GetVersionChangesAsContent(string fileVersion)
         {
             if (string.IsNullOrWhiteSpace(fileVersion))
             {
@@ -70,7 +69,7 @@ namespace Github_Co_Pilot_Local.LocalTools
                 fileInfo.Length,
                 fileInfo.LastWriteTimeUtc);
 
-            var content = File.ReadAllBytes(filePath);
+            var content = await File.ReadAllBytesAsync(filePath);
 
             _logger.Information(
                 "Successfully read swagger file for version {FileVersion}; bytesRead={BytesRead}",
@@ -88,7 +87,7 @@ namespace Github_Co_Pilot_Local.LocalTools
         Extract only the packages intended for the production environment.
         Present the response to the user in a client-facing tabular format.
         """)]
-        private byte[] GetPackageInformation()
+        private async Task<byte[]> GetPackageInformation()
         {
             _logger.Information("GetPackageInformation started");
 
@@ -123,7 +122,7 @@ namespace Github_Co_Pilot_Local.LocalTools
                 fileInfo.Length,
                 fileInfo.LastWriteTimeUtc);
 
-            var content = File.ReadAllBytes(filePath);
+            var content = await File.ReadAllBytesAsync(filePath);
 
             _logger.Information(
                 "Successfully read package file; bytesRead={BytesRead}",
@@ -140,7 +139,7 @@ namespace Github_Co_Pilot_Local.LocalTools
         The tool searches the local node_modules tree for the package directory and then searches its subdirectories for a license file.
         Return the license name or license file content in a concise client-facing format.
         """)]
-        private string GetLicenseFromNodeModules(string packageName)
+        private async Task<string> GetLicenseFromNodeModules(string packageName)
         {
             if (string.IsNullOrWhiteSpace(packageName))
             {
@@ -228,7 +227,7 @@ namespace Github_Co_Pilot_Local.LocalTools
 
             _logger.Information("License file found for {PackageName}: {LicenseFile}", packageName, licenseFile);
 
-            var licenseContent = File.ReadAllText(licenseFile);
+            var licenseContent = await File.ReadAllTextAsync(licenseFile);
             _logger.Debug("Read license file content for {PackageName}; length={Length}", packageName, licenseContent.Length);
 
             return licenseContent;
